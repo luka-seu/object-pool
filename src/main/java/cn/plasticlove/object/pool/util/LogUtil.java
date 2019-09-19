@@ -1,6 +1,7 @@
 package cn.plasticlove.object.pool.util;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 
 import java.util.logging.*;
@@ -11,16 +12,29 @@ import java.util.logging.*;
  **/
 
 public class LogUtil {
+    private static FileHandler fileHandler;
+
+    static {
+        try {
+            fileHandler = new FileHandler("log.log");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
-    public static void info(String tag, String msg) throws IOException {
+    public static void info(String tag, String msg) {
         Logger log = Logger.getLogger("pool log");
         log.setLevel(Level.ALL);
-        FileHandler fileHandler = new FileHandler("log.log");
+        try {
+            fileHandler.setEncoding("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         fileHandler.setLevel(Level.ALL);
         fileHandler.setFormatter(new LogFormatter());
         log.addHandler(fileHandler);
-        log.info("This is test java util log");
+        log.info(tag + " " + msg);
     }
 
     static class LogFormatter extends Formatter {
@@ -28,8 +42,9 @@ public class LogUtil {
         public String format(LogRecord record) {
             Date date = new Date();
             String sDate = date.toString();
-            return "[" + sDate + "]" + "[" + record.getLevel() + "]"
+            return "[" + sDate + "]" + "[" + record.getThreadID() + "]" + "[" + record.getLevel() + "]"
                     + record.getClass() + record.getMessage() + "\n";
+
         }
     }
 

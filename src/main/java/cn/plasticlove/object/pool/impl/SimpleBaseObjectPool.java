@@ -4,8 +4,7 @@ import cn.plasticlove.object.pool.*;
 import cn.plasticlove.object.pool.exception.IllegalObjectStateException;
 import cn.plasticlove.object.pool.exception.NoMoreIdleSpaceException;
 import cn.plasticlove.object.pool.exception.ObjectDestroyException;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
+import cn.plasticlove.object.pool.util.LogUtil;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -20,21 +19,21 @@ import java.util.concurrent.*;
  * 2.初始化对象池
  * </p>
  *
- *      <p>(1). 初始化日志组件</p>
- *      <p>(2). 包括将{@link SimpleBaseObjectPoolConfig}的配置设置进来。</p>
- *      <p>(3). 初始化空闲对象队列，确保其不低于最小空闲对象数</p>
- *      <p>(4). 开启监控空闲对象生命周期的定时任务</p>
+ * <p>(1). 包括将{@link SimpleBaseObjectPoolConfig}的配置设置进来。</p>
+ * <p>(2). 初始化空闲对象队列，确保其不低于最小空闲对象数</p>
+ * <p>(3). 开启监控空闲对象生命周期的定时任务</p>
  * <p>3.使用对象池</p>
- *      <p>(1). 对象池初始化出来会有{@link SimpleBaseObjectPool#minIdel}个空闲对象，存放在{@link SimpleBaseObjectPool#idleObjects}队列中；整个对象池也会有{@link SimpleBaseObjectPool#minIdel}个对象，存放在{@link SimpleBaseObjectPool#allObjects}的map中</p>
- *      <p>(2). 每次获取对象，会从空闲队列中获取，这是如果空闲队列长度小于{@link SimpleBaseObjectPool#minIdel}，会新建对象加入空闲队列中，也会加入到整个对象池的{@link SimpleBaseObjectPool#allObjects}中</p>
- *      <p>(3). 当{@link SimpleBaseObjectPool#allObjects}长度达到{@link SimpleBaseObjectPool#maxTotal}时，就不允许新建对象。{@link SimpleBaseObjectPool#idleObjects}的长度会随着线程获取对象而减少，当{@link SimpleBaseObjectPool#idleObjects}长度为零时，获取对象的线程会被阻塞</p>
- *      <p>(4). 空闲对象超过{@link SimpleBaseObjectPool#maxLiveTime}会被回收.但仍需要保证对象池的最小空闲对象数。</p>
+ * <p>(1). 对象池初始化出来会有{@link SimpleBaseObjectPool#minIdel}个空闲对象，存放在{@link SimpleBaseObjectPool#idleObjects}队列中；整个对象池也会有{@link SimpleBaseObjectPool#minIdel}个对象，存放在{@link SimpleBaseObjectPool#allObjects}的map中</p>
+ * <p>(2). 每次获取对象，会从空闲队列中获取，这是如果空闲队列长度小于{@link SimpleBaseObjectPool#minIdel}，会新建对象加入空闲队列中，也会加入到整个对象池的{@link SimpleBaseObjectPool#allObjects}中</p>
+ * <p>(3). 当{@link SimpleBaseObjectPool#allObjects}长度达到{@link SimpleBaseObjectPool#maxTotal}时，就不允许新建对象。{@link SimpleBaseObjectPool#idleObjects}的长度会随着线程获取对象而减少，当{@link SimpleBaseObjectPool#idleObjects}长度为零时，获取对象的线程会被阻塞</p>
+ * <p>(4). 空闲对象超过{@link SimpleBaseObjectPool#maxLiveTime}会被回收.但仍需要保证对象池的最小空闲对象数。</p>
  *
  * @author luka-seu
  * @version 1.0
  **/
 
 public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
+    private static final String TAG = SimpleBaseObjectPool.class.getSimpleName();
     /**
      * 对象工厂，用于对象池中对象的创建和销毁
      */
@@ -56,10 +55,6 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
      * 使用map是为了在返还对象的时候可以检查对象是否还存在于对象池中
      */
     private Map<PooledObjectWrap<T>, PooledObject<T>> allObjects = new ConcurrentHashMap<>();
-    /**
-     * 日志组件
-     */
-    private static Logger logger;
 
     /**
      * 对象池中所能容纳的最大对象数
@@ -88,22 +83,22 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             .newSingleThreadScheduledExecutor();
 
     /**
-     *
      * @param factory 对象工厂
      * @param config  自定义的对象池配置
      */
     public SimpleBaseObjectPool(AbstractObjectPoolFactory factory, SimpleBaseObjectPoolConfig config) {
-        initLogTask();
-        logger.info(String.format("the pool started at %s",new Date()));
+
+        LogUtil.info(TAG, String.format("the pool started at %s", new Date()));
+
         if (factory == null) {
-            logger.error("SimpleObjectPoolFactory must not be null");
+            LogUtil.info(TAG, "SimpleObjectPoolFactory must not be null");
             throw new IllegalStateException("factory is null");
 
         }
         this.factory = factory;
 
         if (config == null) {
-            logger.error("SimpleBaseObjectPoolConfig must not be null");
+            LogUtil.info(TAG, "SimpleBaseObjectPoolConfig must not be null");
             throw new IllegalArgumentException("the config for this kind of pool must be SimpleBaseObjectPoolConfig");
         }
         this.setConfig(config);
@@ -114,16 +109,8 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
     }
 
     /**
-     * 初始化日志组件
-     */
-    private void initLogTask(){
-        logger = Logger.getLogger(SimpleBaseObjectPool.class);
-        //log4j的配置文件路径
-        PropertyConfigurator.configure("src/log.properties");
-    }
-
-    /**
      * 根据配置类的参数初始化对象池
+     *
      * @param config 配置类
      */
     private void setConfig(SimpleBaseObjectPoolConfig config) {
@@ -136,7 +123,6 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
     }
 
     /**
-     *
      * @param factory 对象工厂
      * @throws Exception
      */
@@ -155,26 +141,27 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             return;
         }
         this.ensureMinIdel(getMinIdel());
-        logger.info(String.format("pool is inited. min idle objects is %d; max num of objects is %d; there are %d idle objects for use",
-                getMinIdel(),getMaxTotal(),idleObjects.size()));
+        LogUtil.info(TAG, String.format("pool is inited. min idle objects is %d; max num of objects is %d; there are %d idle objects for use",
+                getMinIdel(), getMaxTotal(), idleObjects.size()));
     }
 
     /**
      * 产生数量为idleCount的最小空闲对象数加入到空闲对象队列中
+     *
      * @param idleCount 最小空闲对象数
      */
-    private void ensureMinIdel(int idleCount){
+    private synchronized void ensureMinIdel(int idleCount) {
 
         if (idleCount < 1 || isClosed()) {
             return;
         }
 
         while (idleObjects.size() < idleCount) {
-            logger.info(String.format("the num of idle objects %d is less than minIdle %d, create new idle objects",idleObjects.size(),idleCount));
+            LogUtil.info(TAG, String.format("the num of idle objects %d is less than minIdle %d, create new idle objects", idleObjects.size(), idleCount));
             //当对象池对象数超过最大值，不再确保最小空闲对象数
             if (allObjects.keySet().size() >= getMaxTotal()) {
-                logger.warn(String.format("the pool size %d reached to max num %d! Create new idle object fail!",allObjects.keySet().size(),getMaxTotal()));
-                logger.info(String.format("idle num of objects is %d",idleObjects.size()));
+                LogUtil.info(TAG, String.format("the pool size %d reached to max num %d! Create new idle object fail!", allObjects.keySet().size(), getMaxTotal()));
+                LogUtil.info(TAG, String.format("idle num of objects is %d", idleObjects.size()));
                 blocked = true;
                 break;
             }
@@ -190,7 +177,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             //从设置为空闲状态开始的时间设为上次使用的时间点
             p.setLastUsedTime(System.currentTimeMillis());
             allObjects.put(new PooledObjectWrap<>(p.getObject()), p);
-            logger.info(String.format("now idle num and total num of objects is %d and %d",idleObjects.size(),allObjects.keySet().size()));
+            LogUtil.info(TAG, String.format("now idle num and total num of objects is %d and %d", idleObjects.size(), allObjects.keySet().size()));
         }
         //防止其他线程已经关闭对象池，如果关闭，将对象池清空。防止内存泄露
         if (isClosed()) {
@@ -200,6 +187,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 设置是否阻塞机制
+     *
      * @param blocked
      */
     public void setBlocked(boolean blocked) {
@@ -226,6 +214,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 调用对象工厂创建对象
+     *
      * @return 对象池对象的包装类
      */
     private PooledObject<T> create() {
@@ -233,11 +222,11 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
         try {
             obj = factory.makeObject();
         } catch (Exception e) {
-            logger.error("error when create object"+e.getMessage());
+            LogUtil.info(TAG, "error when create object" + e.getMessage());
             e.printStackTrace();
         }
         //新创建的对象默认都是空闲状态
-        if (obj!=null) {
+        if (obj != null) {
             obj.setState(PooledObjectState.IDEL);
         }
 
@@ -246,6 +235,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 将对象加入到空闲队列中
+     *
      * @param obj 待加入的对象包装类
      */
     private void addIdelQueue(PooledObject<T> obj) {
@@ -253,7 +243,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             try {
                 obj = factory.makeObject();
             } catch (Exception e) {
-                logger.error("error when create object"+e.getMessage());
+                LogUtil.info(TAG, "error when create object" + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -267,6 +257,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 获取对象
+     *
      * @return 需要的对象
      * @throws NoMoreIdleSpaceException
      */
@@ -277,50 +268,63 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 从对象池中获取对象
+     *
      * @param maxTimeWaitMills 阻塞时的最长等待时间
      * @return 需要的对象
      * @throws NoMoreIdleSpaceException
      */
     private T getObject(long maxTimeWaitMills) throws NoMoreIdleSpaceException {
-        logger.info("start getting object");
+        LogUtil.info(TAG, "start getting object");
         PooledObject obj = null;
         //首先判断是否设置了阻塞机制
         if (blocked) {
-            logger.info(String.format("blocked queue,wait time is %s mills",getMaxWaitTime()));
+            LogUtil.info(TAG, String.format("blocked queue,wait time is %s mills", getMaxWaitTime()));
             obj = idleObjects.pollFirst();
             if (obj == null) {
-                //当阻塞机制设为负值，可以一直等待下去
-                if (maxTimeWaitMills < 0) {
+                //如果空闲队列没有，且还未达到最大容量就新建对象
+                if (allObjects.size()<getMaxTotal()){
+                    LogUtil.info(TAG, String.format("no idle objects, create new object, the num of objects in pool is %d", allObjects.size()));
                     try {
-                        obj = idleObjects.takeFirst();
-                    } catch (InterruptedException e) {
+                        obj = factory.makeObject();
+                        allObjects.put(new PooledObjectWrap<T>((T) obj.getObject()),obj);
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
-                } else {
-                    try {
-                        obj = idleObjects.pollFirst(maxTimeWaitMills, TimeUnit.MILLISECONDS);
-                    } catch (InterruptedException e) {
-                        logger.error(e.getMessage());
-                        e.printStackTrace();
+                    //表明对象池已满，且无空闲对象
+                }else {
+                    //当阻塞机制设为负值，可以一直等待下去
+                    if (maxTimeWaitMills < 0) {
+                        try {
+                            obj = idleObjects.takeFirst();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        try {
+                            obj = idleObjects.pollFirst(maxTimeWaitMills, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            LogUtil.info(TAG, e.getMessage());
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
             //达到最长等待时间还未获取到对象
             if (obj == null) {
-                logger.info("get object fail");
+                LogUtil.info(TAG, "get object fail");
                 throw new NoMoreIdleSpaceException("there is no more idle object and the wait time is out");
             }
             //没有设置阻塞机制
         } else {
-            logger.info("not blocked queue");
+            LogUtil.info(TAG, "not blocked queue");
             obj = idleObjects.pollFirst();
             if (obj == null) {
-                logger.info("get object fail");
+                LogUtil.info(TAG, "get object fail");
                 throw new IllegalStateException("make object failure");
             }
         }
         obj.setState(PooledObjectState.USING);
-        logger.info("get object successfully");
+        LogUtil.info(TAG, "get object successfully");
         //确保空闲对象数不少于最小值
         ensureMinIdel(getMinIdel());
 
@@ -329,13 +333,14 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 向对象池中返还对象
+     *
      * @param obj 待返还的对象
      * @throws ObjectDestroyException
      * @throws IllegalObjectStateException
      */
     @Override
     public void returnObject(T obj) throws ObjectDestroyException, IllegalObjectStateException {
-        logger.info("returning object");
+        LogUtil.info(TAG, "returning object");
         //判断对象是否还属于对象池
         PooledObject<T> p = allObjects.get(new PooledObjectWrap<>(obj));
         if (p == null) {
@@ -345,7 +350,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
         //同步是防止其他线程改变对象状态
         synchronized (p) {
             if (state != PooledObjectState.USING) {
-                logger.error("state of Object is not using, cannot return to pool");
+                LogUtil.info(TAG, "state of Object is not using, cannot return to pool");
                 throw new IllegalObjectStateException("the object is in wrong state");
             }
         }
@@ -361,11 +366,12 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             p.setState(PooledObjectState.IDEL);
             p.setLastUsedTime(System.currentTimeMillis());
         }
-        logger.info("finish return object");
+        LogUtil.info(TAG, "finish return object");
     }
 
     /**
      * 获取对象池最大容量
+     *
      * @return
      */
     @Override
@@ -375,6 +381,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 获取对象池活跃的（正在使用）的对象数
+     *
      * @return
      */
     @Override
@@ -401,7 +408,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             //关闭清除过期空闲对象的定时任务
             service.shutdownNow();
             closed = true;
-            logger.info(String.format("pool is closed at %s",new Date()));
+            LogUtil.info(TAG, String.format("pool is closed at %s", new Date()));
         }
     }
 
@@ -409,7 +416,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
      * 清除对象池中所有的空闲对象
      */
     @Override
-    public void clear()  {
+    public void clear() {
         PooledObject<T> p = idleObjects.poll();
 
         while (p != null) {
@@ -425,6 +432,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 判断是否已经关闭对象池
+     *
      * @return
      */
     @Override
@@ -434,6 +442,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 判断是否设置阻塞机制
+     *
      * @return
      */
     @Override
@@ -443,12 +452,13 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 销毁对象
+     *
      * @param p 待摧毁的对象
      * @throws ObjectDestroyException
      */
     @Override
     public void destroy(PooledObject<T> p) throws ObjectDestroyException {
-        logger.info("start to destroy object");
+        LogUtil.info(TAG, "start to destroy object");
         idleObjects.remove(p);
         allObjects.remove(new PooledObjectWrap<>(p.getObject()));
         factory.destroyObject(p);
@@ -465,7 +475,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
             @Override
             public void run() {
                 try {
-                    logger.info(Thread.currentThread().getName()+" start to clear the idle objects which are time out");
+                    LogUtil.info(TAG, Thread.currentThread().getName() + " start to clear the idle objects which are time out");
                     removeTimeOutedObject();
                 } catch (ObjectDestroyException e) {
                     e.printStackTrace();
@@ -478,6 +488,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 清除对象池的过期空闲对象
+     *
      * @throws ObjectDestroyException
      */
     @Override
@@ -506,6 +517,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 确保对象池时开着的状态
+     *
      * @return
      */
     private boolean assertOpen() {
@@ -517,6 +529,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 获取当前对象池最大容量
+     *
      * @return 当前对象池最大容量
      */
     private int getMaxTotal() {
@@ -525,6 +538,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 设置当前对象池的最大容量
+     *
      * @param maxTotal 当前对象池的最大容量
      */
     private void setMaxTotal(int maxTotal) {
@@ -533,6 +547,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 获取当前对象池的最小空闲对象数
+     *
      * @return 当前对象池的最小空闲对象数
      */
     public int getMinIdel() {
@@ -541,48 +556,61 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
 
     /**
      * 获取当前对象池的空闲对象的最长生命周期
+     *
      * @return 当前对象池的空闲对象的最长生命周期
      */
     public long getMaxLiveTime() {
         return maxLiveTime;
     }
+
     /**
      * 设置当前对象池的空闲对象的最长生命周期
-     * @param maxLiveTime  当前对象池的空闲对象的最长生命周期
+     *
+     * @param maxLiveTime 当前对象池的空闲对象的最长生命周期
      */
     private void setMaxLiveTime(long maxLiveTime) {
         this.maxLiveTime = maxLiveTime;
     }
+
     /**
      * 设置当前对象池的最小空闲对象数
+     *
      * @param minIdel 当前对象池的最小空闲对象数
      */
     private void setMinIdel(int minIdel) {
         this.minIdel = minIdel;
     }
+
     /**
      * 获取当前对象池获取对象策略
+     *
      * @return 当前对象池获取对象策略
      */
     public ObtainPolicy getObtainPolicy() {
         return obtainPolicy;
     }
+
     /**
      * 设置当前对象池获取对象策略
-     * @param obtainPolicy  当前对象池获取对象策略
+     *
+     * @param obtainPolicy 当前对象池获取对象策略
      */
     private void setObtainPolicy(ObtainPolicy obtainPolicy) {
         this.obtainPolicy = obtainPolicy;
     }
+
     /**
      * 获取当前对象池最长阻塞时间
+     *
      * @return 当前对象池最长阻塞时间
      */
     public long getMaxWaitTime() {
         return maxWaitTime;
     }
+
     /**
      * 设置当前对象池最长阻塞时间
+     *
      * @param maxWaitTime 当前对象池最长阻塞时间
      */
     private void setMaxWaitTime(long maxWaitTime) {
@@ -592,6 +620,7 @@ public class SimpleBaseObjectPool<T> implements BaseObjectPool<T> {
     /**
      * 用于存放所有对象的map的键
      * 使用的也是包装类
+     *
      * @param <T>
      */
     static class PooledObjectWrap<T> {
