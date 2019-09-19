@@ -19,7 +19,7 @@ public class SampleCode {
     public static void main(String[] args) throws Exception {
 
         SimpleBaseObjectPoolConfig config = new SimpleBaseObjectPoolConfig();
-        config.setMinIdel(0);
+        config.setMinIdel(1);
         config.setMaxTotal(3);
         AbstractObjectPoolFactory factory = new AbstractObjectPoolFactory() {
             @Override
