@@ -1,9 +1,9 @@
-package cn.plasticlove.main;
+package cn.plasticlove.object.pool.test;
+
 
 /**
+ * 测试用对象
  * @author luka-seu
- * @description
- * @create 2019-09 16-18:44
  **/
 
 public class Person {
@@ -33,4 +33,6 @@ public class Person {
     public void setAge(int age) {
         this.age = age;
     }
+
+
 }

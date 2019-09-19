@@ -1,16 +1,29 @@
 package cn.plasticlove.object.pool;
 
 /**
+ * 对象池中对象所处于的状态
+ * 包括空闲状态和使用中状态
  * @author luka-seu
- * @description
- * @create 2019-09 16-18:40
+ * @version 1.0
  **/
 
 public enum PooledObjectState {
-    IDEL(0,"idel"),
+    /**
+     * 空闲状态
+     */
+    IDEL(0,"idle"),
+    /**
+     * 使用状态
+     */
     USING(1,"using");
-    private int code;
-    private String msg;
+    /**
+     * code
+     */
+    private final int code;
+    /**
+     * msg
+     */
+    private final String msg;
 
     PooledObjectState(int code, String msg) {
         this.code = code;
